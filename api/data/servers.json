@@ -1,0 +1,42 @@
+[
+  {
+    "id": "survie-legacy",
+    "name": "Survie Legacy",
+    "description": "Serveur survie principal, modpack maison.",
+    "iconUrl": "https://votre-site.example.com/launcher/servers/survie-legacy.png",
+    "minecraftVersion": "1.20.1",
+    "loader": {
+      "type": "fabric",
+      "version": "0.15.11"
+    },
+    "modpackId": "survie-legacy",
+    "javaArgs": [
+      "-Xmx4G"
+    ],
+    "serverAddress": "play.votre-site.example.com",
+    "onlineMode": true
+  },
+  {
+    "id": "modded-antique",
+    "name": "Modded Retro (1.7.10)",
+    "description": "Exemple de profil sur une vieille version + Forge ancien.",
+    "iconUrl": "https://votre-site.example.com/launcher/servers/modded-antique.png",
+    "minecraftVersion": "1.7.10",
+    "loader": {
+      "type": "forge",
+      "version": "10.13.4.1614"
+    },
+    "rcon": {
+      "host": "203.0.113.10",
+      "port": 25575,
+      "password": "un-mot-de-passe-long-et-different-du-launcherKey"
+    },
+    "optifine": {
+      "version": "1.7.10_HD_U_E7"
+    },
+    "modpackId": "modded-antique",
+    "javaArgs": [],
+    "serverAddress": "203.0.113.10:25565",
+    "onlineMode": false
+  }
+]

@@ -1,0 +1,31 @@
+node_modules/
+dist/
+out/
+*.log
+
+# Secrets
+api/.env
+launcher/launcher.config.json
+
+# Contenu réel des modpacks (volumineux, souvent sous licence tierce) : on ne garde
+# que le manifest.json de chaque modpack
+api/modpacks/*/*
+!api/modpacks/*/manifest.json
+
+# Fichiers publics réels de l'API (logo, musique...)
+api/public/*
+!api/public/.gitkeep
+
+# Installeurs de mise à jour générés par electron-builder
+api/updates/*
+!api/updates/.gitkeep
+
+# Serveurs Minecraft générés par l'onglet "Serveur Minecraft" de l'admin
+serveurs-minecraft/
+
+# Fichiers sources des icônes et autres ressources locales
+assets/
+
+# Clé privée de signature des mises à jour : elle reste sur le PC de l'éditeur
+*update-signing-private.pem
+.modcraft-signing/

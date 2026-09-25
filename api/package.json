@@ -1,0 +1,27 @@
+{
+  "name": "modcraft-deploy-api",
+  "version": "1.0.0",
+  "description": "Backend: echange de token + configuration branding/serveurs + manifest d'integrite pour ModCraft Deploy",
+  "author": "Yvan Braga",
+  "license": "GPL-3.0-or-later",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "manifest": "node scripts/generate-manifest.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.1",
+    "basic-ftp": "^5.3.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "rcon-client": "^4.2.5",
+    "ssh2-sftp-client": "^12.1.1"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
+  }
+}

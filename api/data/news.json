@@ -1,0 +1,8 @@
+[
+  {
+    "id": "welcome",
+    "title": "Bienvenue sur ModCraft Deploy",
+    "date": "2026-09-14",
+    "body": "Ceci est un exemple d'annonce. Modifiez ou supprimez cette entrée dans api/data/news.json, et ajoutez-en une par mise à jour ou événement : la plus récente (première du tableau) s'affiche en premier dans le launcher."
+  }
+]

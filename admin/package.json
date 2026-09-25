@@ -1,0 +1,78 @@
+{
+  "name": "modcraft-deploy-admin",
+  "version": "1.0.0",
+  "description": "Panneau d'administration desktop pour ModCraft Deploy : gestion des serveurs/modpacks/branding, generation du manifest, lancement de l'API en local",
+  "main": "src/main/main.js",
+  "author": "Yvan Braga",
+  "homepage": "https://modcraft-deploy.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yvanb26/modcraft-deploy.git"
+  },
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.1",
+    "basic-ftp": "^5.0.5",
+    "electron-updater": "^6.8.9",
+    "ssh2-sftp-client": "^12.1.1"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.modcraftdeploy.admin",
+    "productName": "ModCraft Deploy Admin",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../api",
+        "to": "api-template",
+        "filter": [
+          "**/*",
+          "!node_modules/**",
+          "!node_modules",
+          "!.env",
+          "!.git/**",
+          "!.git",
+          "!modpacks/**",
+          "!data/servers.json"
+        ]
+      },
+      {
+        "from": "../api/node_modules",
+        "to": "api-modules",
+        "filter": [
+          "**/*",
+          "!.bin/**",
+          "!.bin"
+        ]
+      }
+    ],
+    "publish": {
+      "provider": "generic",
+      "url": "https://modcraft-deploy.com/updates/admin"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "ModCraft-Deploy-Admin-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
