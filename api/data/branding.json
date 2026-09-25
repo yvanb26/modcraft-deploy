@@ -1,0 +1,39 @@
+{
+  "launcherName": "ModCraft Deploy Launcher",
+  "language": "fr",
+  "logoUrl": "https://votre-site.example.com/branding/logo.png",
+  "backgroundUrl": "https://votre-site.example.com/branding/background.jpg",
+  "windowIconUrl": "",
+  "accentColor": "#5ca8ff",
+  "theme": {
+    "bg": "#060a12",
+    "panel": "#0c1422",
+    "panelLight": "#131f34",
+    "text": "#eef4ff",
+    "textDim": "#9cb0d0",
+    "danger": "#f0616d",
+    "success": "#56d18b"
+  },
+  "musicUrl": "",
+  "discordUrl": "https://discord.gg/votre-serveur",
+  "websiteUrl": "https://votre-site.example.com",
+  "microsoftAuth": {
+    "enabled": false,
+    "clientId": ""
+  },
+  "elybyAuth": {
+    "enabled": true
+  },
+  "offlineAuth": {
+    "enabled": true
+  },
+  "customInstances": {
+    "enabled": true,
+    "bannerUrl": ""
+  },
+  "discordRpc": {
+    "enabled": false,
+    "clientId": ""
+  },
+  "easterEgg": []
+}

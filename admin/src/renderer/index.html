@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Defense en profondeur : script-src 'self' empeche tout script/
+       gestionnaire inline de s'executer si du texte non echappe (ex: nom de
+       fichier distant liste via SFTP) finissait par etre injecte : seul
+       renderer.js (local) peut tourner. Rien ici ne charge d'image/media
+       distant, donc pas besoin d'ouvrir img-src/media-src au web. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data:;
+    connect-src 'self';
+    object-src 'none';
+    base-uri 'none';
+    form-action 'none';
+    frame-src 'none';
+  " />
+  <title>ModCraft Deploy Admin</title>
+  <!-- Applique le theme (clair/sombre) avant le premier rendu : evite un flash. -->
+  <script src="theme-init.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>ModCraft Deploy <span class="dim">Admin</span></h1>
+      <div class="spacer"></div>
+      <button class="secondary" id="btn-guide">📘 Guide</button>
+      <div class="api-dir-indicator" id="api-dir-indicator">Recherche du dossier api/...</div>
+      <button class="primary" id="btn-recreate-apidir" style="display:none;">🔧 Recreer le dossier api/</button>
+      <button class="icon-btn" id="btn-appearance" title="Apparence : couleur de l'outil" aria-label="Apparence">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.3-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.3c1.5 0 2.7-1.2 2.7-2.7C21 6.9 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="14.5" cy="7" r="1"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-theme" title="Basculer thème clair / sombre" aria-label="Thème">
+        <svg class="ico-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="ico-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+      <div class="window-controls">
+        <button class="win-btn" id="win-min" title="Réduire" aria-label="Réduire">
+          <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 6h8"/></svg>
+        </button>
+        <button class="win-btn" id="win-max" title="Agrandir" aria-label="Agrandir">
+          <svg class="ico-max" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="8" height="8" rx="1.5"/></svg>
+          <svg class="ico-restore" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="6" height="6" rx="1.2"/><path d="M4.5 4V3.2A1.2 1.2 0 0 1 5.7 2h3.1A1.2 1.2 0 0 1 10 3.2v3.1a1.2 1.2 0 0 1-1.2 1.2H8"/></svg>
+        </button>
+        <button class="win-btn win-close" id="win-close" title="Fermer" aria-label="Fermer">
+          <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="dashboard">Tableau de bord</button>
+      <button class="tab-btn" data-tab="servers">Serveurs</button>
+      <button class="tab-btn" data-tab="mcserver">Serveur Minecraft</button>
+      <button class="tab-btn" data-tab="branding">Branding</button>
+      <button class="tab-btn" data-tab="news">Annonces</button>
+      <button class="tab-btn" data-tab="deploy">Déploiement</button>
+    </nav>
+
+    <main>
+      <!-- Tableau de bord -->
+      <section class="tab-panel active" id="tab-dashboard">
+        <div class="card">
+          <h2>Serveur API local</h2>
+          <p class="dim">Lance <code>node src/index.js</code> dans le dossier api/ selectionne : pratique pour tester une config avant de la pousser sur votre serveur reel (PufferPanel, etc.). "Demarrer depuis la sauvegarde" relance ce meme serveur mais depuis la derniere sauvegarde (voir ci-dessous), pour tester un etat fige pendant que vous continuez a modifier la config en cours.</p>
+          <div class="row">
+            <button class="primary" id="btn-start-server">▶ Demarrer</button>
+            <button class="secondary" id="btn-start-server-backup" disabled>▶ Demarrer depuis la sauvegarde</button>
+            <button class="secondary" id="btn-stop-server">⏹ Arreter</button>
+            <span class="badge" id="server-status-badge">Arrete</span>
+          </div>
+          <pre class="log" id="server-log"></pre>
+        </div>
+
+        <div class="card">
+          <h2>Sauvegarde locale</h2>
+          <p class="dim">Copie l'integralite du dossier api/ selectionne (data/, modpacks/, code...) dans une sauvegarde locale unique, ecrasee a chaque nouvelle sauvegarde : pratique pour figer un etat connu-bon avant de continuer a modifier la config, ou pour tester "Demarrer depuis la sauvegarde" ci-dessus sans que vos modifications en cours n'affectent ce test.</p>
+          <div class="row">
+            <button class="secondary" id="btn-create-backup">💾 Faire une sauvegarde</button>
+            <span class="field-hint" id="backup-status-indicator">Aucune sauvegarde</span>
+          </div>
+          <pre class="log" id="backup-log"></pre>
+        </div>
+
+        <div class="card">
+          <h2>Cle du launcher (LAUNCHER_KEY)</h2>
+          <p class="dim">Cle secrete que chaque launcher doit presenter pour obtenir un acces a l'API (<code>api/.env</code>). La changer invalide tous les launchers deja installes tant qu'ils n'ont pas ete mis a jour avec la nouvelle valeur (leur <code>launcher.config.json</code> local n'est jamais mis a jour tout seul) : a faire uniquement si la cle a fuite ou pour une nouvelle communaute. Redemarrez aussi l'API (le "Serveur API local" ci-dessus, ou votre PufferPanel) pour qu'elle prenne effet : elle n'est lue qu'au demarrage du process.</p>
+          <div class="row">
+            <input type="text" id="launcherkey-input" style="flex:1; min-width:280px;" placeholder="Cle actuelle" />
+            <button class="secondary" id="btn-launcherkey-generate">🎲 Generer une cle aleatoire</button>
+            <button class="primary" id="btn-launcherkey-save">💾 Enregistrer</button>
+          </div>
+          <div class="field-hint" id="launcherkey-status"></div>
+        </div>
+
+        <div class="card">
+          <h2>Connecter le launcher a ce serveur local</h2>
+          <p class="dim">Copiez ceci dans <code>launcher/launcher.config.json</code> pour faire pointer le launcher joueur vers ce serveur local le temps de tester (au lieu de votre serveur reel).</p>
+          <div class="row">
+            <button class="secondary" id="btn-copy-launcher-config">📋 Copier launcher.config.json</button>
+            <span class="field-hint" id="launcher-config-status"></span>
+          </div>
+          <pre class="log" id="launcher-config-preview" style="height:auto; min-height:0;"></pre>
+        </div>
+      </section>
+
+      <!-- Serveurs -->
+      <section class="tab-panel" id="tab-servers">
+        <div class="toolbar-row">
+          <button class="primary" id="btn-new-server">+ Nouveau serveur</button>
+        </div>
+        <div class="grid" id="servers-list"></div>
+      </section>
+
+      <!-- Branding -->
+      <section class="tab-panel" id="tab-branding">
+        <div class="card">
+          <h2>Identite</h2>
+          <div class="form-grid">
+            <label class="field"><span>Nom du launcher</span><input id="br-launcherName" /></label>
+            <label class="field"><span>Langue</span>
+              <select id="br-language"><option value="fr">Francais</option><option value="en">English</option></select>
+            </label>
+            <label class="field"><span>Couleur d'accent</span><input id="br-accentColor" type="color" /></label>
+            <label class="field"><span>Logo (URL)</span><input id="br-logoUrl" /></label>
+            <label class="field"><span>Fond d'ecran (URL)</span><input id="br-backgroundUrl" /></label>
+            <label class="field"><span>Icone de fenetre (URL)</span><input id="br-windowIconUrl" /></label>
+            <label class="field"><span>Musique (URL)</span><input id="br-musicUrl" /></label>
+            <label class="field"><span>Site web</span><input id="br-websiteUrl" /></label>
+            <label class="field"><span>Discord</span><input id="br-discordUrl" /></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Theme de couleurs</h2>
+          <p class="dim">Ces couleurs s'appliquent au mode sombre du launcher. Le mode clair utilise la palette integree (l'accent choisi plus haut reste commun aux deux).</p>
+          <div class="form-grid">
+            <label class="field"><span>Fond</span><input id="br-theme-bg" type="color" /></label>
+            <label class="field"><span>Panneau</span><input id="br-theme-panel" type="color" /></label>
+            <label class="field"><span>Panneau clair</span><input id="br-theme-panelLight" type="color" /></label>
+            <label class="field"><span>Texte</span><input id="br-theme-text" type="color" /></label>
+            <label class="field"><span>Texte attenue</span><input id="br-theme-textDim" type="color" /></label>
+            <label class="field"><span>Danger</span><input id="br-theme-danger" type="color" /></label>
+            <label class="field"><span>Succes</span><input id="br-theme-success" type="color" /></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Connexion</h2>
+          <label class="checkbox-field"><input type="checkbox" id="br-offline-enabled" /><span>Compte gratuit (hors-ligne)</span></label>
+
+          <label class="checkbox-field"><input type="checkbox" id="br-elyby-enabled" /><span>Ely.by</span></label>
+
+          <label class="checkbox-field"><input type="checkbox" id="br-ms-enabled" /><span>Microsoft</span></label>
+          <label class="field"><span>Microsoft : Application (client) ID</span><input id="br-ms-clientId" /></label>
+
+          <label class="checkbox-field"><input type="checkbox" id="br-custom-enabled" /><span>Versions libres (page "choisir sa version")</span></label>
+          <label class="field"><span>Versions libres : Bannière (URL, générique pour toutes les installations)</span><input id="br-custom-bannerUrl" placeholder="https://..." /></label>
+
+          <label class="checkbox-field"><input type="checkbox" id="br-discordrpc-enabled" /><span>Discord Rich Presence</span></label>
+          <label class="field"><span>Discord RPC : Client ID</span><input id="br-discordrpc-clientId" /></label>
+        </div>
+
+        <div class="card">
+          <h2>Easter egg (zones cachées)</h2>
+          <p class="dim">Chaque entrée est rattachée à une zone fixe et invisible de la fenêtre du launcher (un coin, ou le texte de copyright) : cliquer dessus déclenche le son ou le gif associé, directement, sans compteur ni combinaison à réussir. Pour lancer un gif <strong>et</strong> un mp3 en même temps au même endroit, ajoute deux lignes sur la même zone (l'une en Gif, l'autre en Son). Anti-spam : tant qu'un easter egg joue (puis 1,5 s après), les clics suivants sont ignorés.</p>
+          <div id="easteregg-list"></div>
+          <div class="row">
+            <button class="secondary" id="btn-easteregg-add">+ Ajouter une zone</button>
+          </div>
+        </div>
+
+        <div class="toolbar-row">
+          <button class="primary" id="btn-save-branding">Enregistrer le branding</button>
+          <span class="field-hint" id="branding-save-status"></span>
+        </div>
+      </section>
+
+      <!-- Annonces -->
+      <section class="tab-panel" id="tab-news">
+        <div class="toolbar-row">
+          <button class="primary" id="btn-new-news">+ Nouvelle annonce</button>
+        </div>
+        <div id="news-list"></div>
+      </section>
+
+      <!-- Deploiement -->
+      <section class="tab-panel" id="tab-deploy">
+        <div class="deploy-intro">
+          <h2>Déploiement</h2>
+          <p class="dim">Envoyez le code de votre API et votre configuration vers votre hébergement, par SFTP ou FTP. Vous ne touchez jamais au serveur Minecraft ici : c'est l'API du launcher qui est mise à jour.</p>
+          <ol class="deploy-flow">
+            <li><span>1</span> Connexion</li>
+            <li><span>2</span> Comparer</li>
+            <li><span>3</span> Envoyer</li>
+            <li><span>4</span> Vérifier</li>
+          </ol>
+        </div>
+
+        <!-- 1. Connexion -->
+        <div class="card deploy-card">
+          <div class="deploy-head">
+            <span class="deploy-ico" aria-hidden="true">🔌</span>
+            <div>
+              <h3>Connexion à l'hébergement</h3>
+              <p class="dim">L'accès SFTP/FTP de votre API (PufferPanel en expose un par serveur). Enregistré chiffré sur cet ordinateur, lié à votre session Windows, comme le reste de la configuration de l'application.</p>
+            </div>
+          </div>
+          <div class="form-grid three">
+            <label class="field"><span>Protocole</span>
+              <select id="sftp-protocol">
+                <option value="sftp">SFTP (SSH) : port 22</option>
+                <option value="ftp">FTP : port 21 (non chiffré)</option>
+                <option value="ftps">FTPS (FTP + TLS) : port 21</option>
+              </select>
+            </label>
+            <label class="field"><span>Hôte</span><input id="sftp-host" placeholder="sftp.exemple.fr" /></label>
+            <label class="field"><span>Port</span><input id="sftp-port" type="number" value="22" /></label>
+          </div>
+          <div class="form-grid">
+            <label class="field"><span>Utilisateur</span><input id="sftp-username" /></label>
+            <label class="field"><span>Mot de passe</span><input id="sftp-password" type="password" /></label>
+          </div>
+          <label class="field"><span>Dossier de l'API sur le serveur (ex : /home/container/api)</span><input id="sftp-remotepath" placeholder="/home/container/api" /></label>
+          <div class="row">
+            <button class="secondary" id="btn-sftp-save">💾 Enregistrer la connexion</button>
+          </div>
+        </div>
+
+        <h2 class="deploy-section-title">Publier</h2>
+
+        <div class="deploy-grid">
+          <!-- 2a. Code -->
+          <div class="card deploy-card">
+            <div class="deploy-head">
+              <span class="deploy-ico" aria-hidden="true">⚙️</span>
+              <div>
+                <h3>Code de l'API <span class="deploy-tag safe">Sans danger</span></h3>
+                <p class="dim">Met à jour <code>src/</code>, <code>scripts/</code>, <code>package.json</code>… sur le serveur. Ne touche <strong>jamais</strong> à <code>data/</code> ni à <code>modpacks/</code>. À relancer après chaque mise à jour du launcher ou de l'admin (par exemple une nouvelle route de l'API).</p>
+              </div>
+            </div>
+            <div class="row">
+              <button class="primary" id="btn-sftp-deploy-code">⬆ Mettre à jour le code</button>
+            </div>
+            <p class="dim">Ensuite : <code>npm install</code> sur le serveur si <code>package.json</code> a changé, puis redémarrez l'API.</p>
+          </div>
+
+          <!-- 2b. Configuration -->
+          <div class="card deploy-card">
+            <div class="deploy-head">
+              <span class="deploy-ico" aria-hidden="true">🗂️</span>
+              <div>
+                <h3>Configuration <span class="deploy-tag warn">Écrase</span></h3>
+                <p class="dim">Remplace <code>data/</code> (branding, serveurs, annonces) et <code>modpacks/</code> sur le serveur par votre copie locale. <strong>Comparez d'abord</strong> : une configuration modifiée ailleurs sur le serveur serait perdue.</p>
+              </div>
+            </div>
+            <label class="checkbox-field">
+              <input type="checkbox" id="sftp-mirror-config" />
+              <span>Supprimer aussi les fichiers distants absents en local (mods retirés…), sinon ils s'accumulent sur le serveur</span>
+            </label>
+            <div class="row">
+              <button class="secondary" id="btn-sftp-diff">🔍 Voir les différences</button>
+              <button class="primary" id="btn-sftp-deploy-config">🚀 Déployer la configuration</button>
+            </div>
+            <div id="sftp-diff-result"></div>
+          </div>
+
+          <!-- 2c. Fichiers individuels -->
+          <div class="card deploy-card deploy-wide">
+            <div class="deploy-head">
+              <span class="deploy-ico" aria-hidden="true">📤</span>
+              <div>
+                <h3>Envoi ciblé <span class="deploy-tag info">Un seul fichier</span></h3>
+                <p class="dim">Envoie un fichier précis, indépendamment du reste : pratique pour une petite modification sans repasser par toute la configuration.</p>
+              </div>
+            </div>
+            <div class="deploy-files">
+              <div class="deploy-file">
+                <button class="secondary" id="btn-sftp-file-branding">📤 branding.json</button>
+                <span class="dim">Apparence et connexions du launcher</span>
+              </div>
+              <div class="deploy-file">
+                <button class="secondary" id="btn-sftp-file-news">📤 news.json</button>
+                <span class="dim">Annonces affichées aux joueurs</span>
+              </div>
+              <div class="deploy-file">
+                <button class="secondary" id="btn-sftp-file-servers-only">📤 servers.json seul</button>
+                <span class="dim">Modification rapide des serveurs (online-mode, RCON, arguments Java, OptiFine…) sans toucher aux modpacks</span>
+              </div>
+              <div class="deploy-file">
+                <button class="secondary" id="btn-sftp-file-servers">📤 servers.json + modpacks</button>
+                <span class="dim">Serveurs et fichiers des modpacks concernés, en comparant avant d'envoyer</span>
+              </div>
+            </div>
+            <label class="checkbox-field">
+              <input type="checkbox" id="sftp-mirror-servers" />
+              <span>« servers.json + modpacks » : supprimer aussi les fichiers distants absents en local dans les modpacks concernés</span>
+            </label>
+          </div>
+        </div>
+
+        <h2 class="deploy-section-title">Vérifier</h2>
+
+        <div class="deploy-grid">
+          <!-- 4. Diagnostic -->
+          <div class="card deploy-card">
+            <div class="deploy-head">
+              <span class="deploy-ico" aria-hidden="true">🩺</span>
+              <div>
+                <h3>Diagnostic</h3>
+                <p class="dim">Liste ce qu'il y a <strong>vraiment</strong> dans le dossier distant configuré : utile pour vérifier qu'il correspond bien à celui que l'API lit (regardez la date de modification des fichiers).</p>
+              </div>
+            </div>
+            <div class="row">
+              <button class="secondary" id="btn-sftp-list">📂 Voir le contenu distant</button>
+            </div>
+            <div id="sftp-remote-listing"></div>
+          </div>
+
+          <!-- Journal -->
+          <div class="card deploy-card">
+            <div class="deploy-head">
+              <span class="deploy-ico" aria-hidden="true">📜</span>
+              <div>
+                <h3>Journal des opérations</h3>
+                <p class="dim">Le détail de chaque envoi : fichiers transférés, ignorés ou supprimés.</p>
+              </div>
+            </div>
+            <pre class="log" id="sftp-log"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Serveur Minecraft pret a l'emploi -->
+      <section class="tab-panel" id="tab-mcserver">
+        <div class="card">
+          <h2>Serveur Minecraft prêt à l'emploi</h2>
+          <p class="dim">Fabrique, à partir de la configuration de cet admin (version, loader, modpack, mode de compte, RCON), un dossier de serveur Minecraft complet : et son zip : utilisable sur n'importe quel hébergeur : PufferPanel, Pterodactyl, VPS, serveur dédié, machine perso. Les mods « client uniquement » sont exclus, rien n'est démarré et l'EULA n'est jamais acceptée à ta place.</p>
+          <div class="form-grid">
+            <label class="field"><span>Serveur</span><select id="mc-server"></select></label>
+            <div class="field"><span>Configuration reprise</span><div class="dim" id="mc-server-info">-</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Paramètres du serveur généré</h2>
+          <div class="form-grid">
+            <label class="field"><span>Port du serveur</span><input id="mc-port" type="number" min="1" max="65535" /></label>
+            <label class="field"><span>Mémoire maximale (Go)</span><input id="mc-memory" type="number" min="1" max="128" /></label>
+            <label class="field"><span>Message du serveur (MOTD)</span><input id="mc-motd" /></label>
+            <label class="field"><span>Joueurs maximum</span><input id="mc-maxplayers" type="number" min="1" max="1000" /></label>
+            <label class="field"><span>Difficulté</span>
+              <select id="mc-difficulty">
+                <option value="peaceful">Pacifique</option><option value="easy">Facile</option>
+                <option value="normal">Normal</option><option value="hard">Difficile</option>
+              </select>
+            </label>
+            <label class="field"><span>Mode de jeu</span>
+              <select id="mc-gamemode">
+                <option value="survival">Survie</option><option value="creative">Créatif</option>
+                <option value="adventure">Aventure</option><option value="spectator">Spectateur</option>
+              </select>
+            </label>
+            <div class="field"><span>Dossier de sortie</span>
+              <div class="row"><input id="mc-outdir" style="flex:1; min-width:180px;" placeholder="(par défaut : à côté du dossier api/)" /><button class="secondary" id="btn-mc-pick-out">Parcourir…</button></div>
+            </div>
+            <div class="field"><span>Ajouts serveur (optionnel)</span>
+              <div class="row"><input id="mc-extras" style="flex:1; min-width:180px;" placeholder="Dossier copié par-dessus (mods serveur, ops.json…)" /><button class="secondary" id="btn-mc-pick-extras">Parcourir…</button></div>
+            </div>
+          </div>
+          <label class="checkbox-field"><input type="checkbox" id="mc-eula" /><span>J'accepte l'EULA de Minecraft (<code>https://aka.ms/MinecraftEULA</code>) : écrit <code>eula=true</code> dans le serveur généré</span></label>
+          <label class="checkbox-field"><input type="checkbox" id="mc-preinstall" /><span>Installer le loader maintenant (Forge, NeoForge, Quilt : si aucun Java compatible n'est installé, l'outil en télécharge un automatiquement) : le dossier est alors directement utilisable, même sur un hébergeur qui ne sait pas lancer d'installeur</span></label>
+          <label class="checkbox-field"><input type="checkbox" id="mc-zip" /><span>Créer aussi un zip</span></label>
+          <div class="row">
+            <button class="primary" id="btn-mc-generate">🛠 Générer le serveur</button>
+            <button class="secondary" id="btn-mc-open" disabled>📂 Ouvrir le dossier</button>
+          </div>
+          <div id="mc-result"></div>
+        </div>
+
+        <div class="card">
+          <h2>Mods : côté client ou serveur</h2>
+          <p class="dim">Un modpack contient des mods qui n'ont de sens que chez le joueur (OptiFine, JourneyMap, Dynamic Lights…) et qui peuvent faire planter un serveur. L'outil en détecte une partie (noms connus, métadonnées Fabric/Quilt) ; les vieux mods ne déclarent rien, c'est donc à toi de corriger : choisis « Client uniquement » pour exclure un mod du serveur. Tes choix sont enregistrés dans <code>api/data/server-sides.json</code>.</p>
+          <div class="row">
+            <input id="mc-mods-filter" placeholder="Filtrer les mods…" style="flex:1; min-width:200px;" />
+            <span class="field-hint" id="mc-mods-summary"></span>
+          </div>
+          <div class="mc-mods" id="mc-mods-list"></div>
+        </div>
+
+        <div class="card">
+          <h2>Envoyer sur l'hébergeur (SFTP / FTP)</h2>
+          <p class="dim">Session <strong>propre à ce serveur Minecraft</strong> (SFTP, ou FTP / FTPS pour les hébergeurs qui n'ont pas de SFTP) : ce n'est pas la même que celle de l'onglet Déploiement (qui vise l'API du launcher), chaque serveur a son hôte, son compte et son dossier. Les identifiants sont enregistrés chiffrés sur cette machine. Les fichiers inchangés ne sont pas renvoyés et <strong>rien n'est supprimé</strong> sur le serveur (le monde n'est jamais touché). Pour un hébergeur sans SFTP, utilise le zip.</p>
+          <div class="form-grid">
+            <label class="field"><span>Protocole</span><select id="mc-sftp-proto"><option value="sftp">SFTP (SSH) : port 22</option><option value="ftp">FTP : port 21 (non chiffré)</option><option value="ftps">FTPS (FTP + TLS) : port 21</option></select></label>
+            <label class="field"><span>Hôte</span><input id="mc-sftp-host" placeholder="ex : panel.mon-hebergeur.fr" autocomplete="off" /></label>
+            <label class="field"><span>Port</span><input id="mc-sftp-port" type="number" min="1" max="65535" placeholder="22" /></label>
+            <label class="field"><span>Utilisateur</span><input id="mc-sftp-user" autocomplete="off" /></label>
+            <label class="field"><span>Mot de passe</span><input id="mc-sftp-pass" type="password" autocomplete="new-password" /></label>
+            <label class="field"><span>Chemin distant du serveur Minecraft</span><input id="mc-remotepath" placeholder="ex : /   ou   /home/container   ou   /servers/mon-serveur" /></label>
+            <div class="field"><span>Connexion</span>
+              <div class="row"><button class="secondary" id="btn-mc-test-sftp">🔌 Tester la connexion</button><span class="field-hint" id="mc-sftp-status"></span></div>
+            </div>
+          </div>
+          <label class="checkbox-field"><input type="checkbox" id="mc-keepconfig" /><span>Ne pas écraser <code>server.properties</code>, <code>eula.txt</code>, <code>jvm-args.txt</code>, <code>ops.json</code>, <code>whitelist.json</code>… s'ils existent déjà sur le serveur</span></label>
+          <label class="checkbox-field"><input type="checkbox" id="mc-mirrormods" /><span>Supprimer sur le serveur les mods absents du dossier généré (<code>mods/</code> uniquement)</span></label>
+          <div class="row">
+            <button class="primary" id="btn-mc-push-files">⬆ Envoyer les fichiers</button>
+            <button class="secondary" id="btn-mc-push-zip">⬆ Envoyer le zip</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Journal</h2>
+          <pre class="log" id="mc-log"></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Codé par VicTeams pour Gamers France.</span>
+      <span class="footer-links">
+        <a href="https://modcraft-deploy.com" target="_blank" rel="noopener noreferrer">🌐 Site</a>
+        <a href="mailto:support@modcraft-deploy.com" target="_blank" rel="noopener noreferrer">✉ Support</a>
+        <a href="https://discord.gg/XmGvvKkr3X" target="_blank" rel="noopener noreferrer">💬 Discord</a>
+        <a href="https://ko-fi.com/modcraft_deploy" target="_blank" rel="noopener noreferrer">☕ Soutenir le projet</a>
+      </span>
+    </footer>
+  </div>
+
+  <!-- Popup edition d'un serveur -->
+  <div class="modal-overlay" id="server-modal">
+    <div class="modal-box">
+      <h2 id="server-modal-title">Nouveau serveur</h2>
+
+      <div class="form-grid">
+        <label class="field"><span>Identifiant (id, unique)</span><input id="sv-id" /></label>
+        <label class="field"><span>Nom affiche</span><input id="sv-name" /></label>
+      </div>
+      <label class="field"><span>Description</span><input id="sv-description" /></label>
+      <div class="form-grid">
+        <label class="field"><span>Bannière (URL, format large ex: 1344×384)</span><input id="sv-iconUrl" placeholder="https://..." /></label>
+        <label class="field"><span>Adresse (host:port)</span><input id="sv-serverAddress" placeholder="play.example.com:25565" /></label>
+      </div>
+      <label class="checkbox-field"><input type="checkbox" id="sv-autoconnect" /><span>Activer l'auto-connexion à ce serveur au lancement du jeu</span></label>
+      <label class="checkbox-field"><input type="checkbox" id="sv-onlinemode" /><span>Online-mode (le serveur Minecraft vérifie les comptes via Mojang : coché = Microsoft uniquement, décoché = tous les comptes acceptés : Microsoft, Ely.by et gratuit)</span></label>
+
+      <div class="form-grid">
+        <label class="field"><span>Version Minecraft</span><select id="sv-mcversion"></select></label>
+        <label class="field"><span>Loader</span>
+          <select id="sv-loader-type">
+            <option value="vanilla">Vanilla</option>
+            <option value="forge">Forge</option>
+            <option value="fabric">Fabric</option>
+            <option value="quilt">Quilt</option>
+            <option value="neoforge">NeoForge</option>
+          </select>
+        </label>
+      </div>
+      <label class="field" id="sv-loaderversion-field"><span>Version du loader</span><select id="sv-loaderversion"></select></label>
+
+      <h3>Modpack (optionnel)</h3>
+      <p class="dim">Laissez vide pour un serveur vanilla (ou tout serveur sans fichiers a distribuer) : le launcher installera simplement le client/loader, sans rien synchroniser en plus.</p>
+      <label class="field"><span>Identifiant du modpack</span><input id="sv-modpackId" placeholder="vide = pas de modpack" /></label>
+      <div class="row">
+        <button class="secondary" id="btn-import-modpack">📁 Choisir le dossier des fichiers</button>
+        <button class="secondary" id="btn-generate-manifest">🧾 Generer le manifest</button>
+      </div>
+      <div class="field-hint" id="modpack-status"></div>
+
+      <h3>Optionnel</h3>
+      <div class="form-grid">
+        <label class="field"><span>OptiFine (version, ex: 1.7.10_HD_U_E7) : jar a deposer dans optifine/, PAS dans mods/</span><input id="sv-optifine" /></label>
+        <label class="field"><span>Java args (separes par des espaces)</span><input id="sv-javaargs" placeholder="-Xmx4G" /></label>
+      </div>
+
+      <fieldset>
+        <legend>RCON (whitelist automatique)</legend>
+        <div class="form-grid">
+          <label class="field"><span>Host</span><input id="sv-rcon-host" /></label>
+          <label class="field"><span>Port</span><input id="sv-rcon-port" type="number" /></label>
+          <label class="field"><span>Mot de passe</span><input id="sv-rcon-password" type="password" /></label>
+        </div>
+        <p class="dim">La whitelist automatique fonctionne directement sur un serveur <strong>en ligne</strong> (Online-mode coché). Sur un serveur <strong>hors ligne</strong>, la commande <code>whitelist add</code> inscrit le vrai UUID du compte Mojang alors que le serveur en calcule un autre à la connexion : l'API écrit donc elle-même <code>whitelist.json</code> (les deux UUID hors ligne du pseudo, casse exacte et minuscules) avec l'<strong>accès SFTP/FTP saisi pour ce serveur dans l'onglet « Serveur Minecraft »</strong> (rien à ressaisir ici : il est recopié automatiquement, dossier distant = dossier du serveur qui contient <code>whitelist.json</code>), puis fait un <code>whitelist reload</code>. Sans cet accès, la whitelist ne marche que pour un pseudo qui n'existe pas chez Mojang. Pensez à déployer <code>servers.json</code> sur l'API après modification.</p>
+      </fieldset>
+
+      <div class="error-box" id="server-modal-error"></div>
+
+      <div class="modal-actions">
+        <button class="secondary" id="btn-server-delete" style="margin-right:auto;">🗑 Supprimer</button>
+        <button class="secondary" id="btn-server-cancel">Annuler</button>
+        <button class="primary" id="btn-server-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popup edition d'une annonce -->
+  <div class="modal-overlay" id="news-modal">
+    <div class="modal-box">
+      <h2>Annonce</h2>
+      <label class="field"><span>Titre</span><input id="news-title" /></label>
+      <label class="field"><span>Date</span><input id="news-date" type="date" /></label>
+      <label class="field"><span>Texte</span><textarea id="news-body" rows="6"></textarea></label>
+      <div class="modal-actions">
+        <button class="secondary" id="btn-news-delete" style="margin-right:auto; display:none;">🗑 Supprimer</button>
+        <button class="secondary" id="btn-news-cancel">Annuler</button>
+        <button class="primary" id="btn-news-save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guide integre (Menu > Guide) : contenu statique, modifiable directement
+       ici (chaque section .guide-section) sans avoir besoin d'un editeur a
+       part. -->
+  <!-- Fenetre Apparence : couleur de l'outil (choix local, memorise sur cet ordinateur) -->
+  <div class="modal-overlay" id="appearance-modal">
+    <div class="modal-box">
+      <h2>🎨 Apparence</h2>
+      <p class="dim">Choisissez la couleur de l'outil. Elle ne change que votre affichage, sur cet ordinateur : ni l'API, ni le launcher, ni vos joueurs ne sont concernés.</p>
+      <div class="option-block">
+        <div class="option-label">Couleur</div>
+        <div class="accent-picker">
+          <input type="color" id="appearance-color" title="Choisir une couleur libre" />
+          <div class="accent-swatches" id="appearance-swatches"></div>
+        </div>
+      </div>
+      <p class="field-hint">Le bouton ☀ / 🌙 de l'en-tête bascule entre le thème clair et le thème sombre : le sombre repose davantage les yeux.</p>
+      <div class="row" style="justify-content:flex-end;">
+        <button class="secondary" id="btn-appearance-reset">Couleur d'origine</button>
+        <button class="primary" id="btn-appearance-close">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="guide-modal">
+    <div class="modal-box wide">
+      <h2>📘 Guide de l'outil Admin</h2>
+
+      <div class="guide-lang-switch">
+        <button class="lang-btn active" data-guide-lang="fr" type="button">🇫🇷 FR</button>
+        <button class="lang-btn" data-guide-lang="en" type="button">🇬🇧 EN</button>
+      </div>
+
+      <!-- ============================= FRANCAIS ============================= -->
+      <div class="guide-lang-block" data-guide-lang="fr">
+        <nav class="guide-toc">
+          <a href="#guide-principe-fr">Principe général</a>
+          <a href="#guide-dashboard-fr">Tableau de bord</a>
+          <a href="#guide-serveurs-fr">Serveurs</a>
+          <a href="#guide-branding-fr">Branding</a>
+          <a href="#guide-annonces-fr">Annonces</a>
+          <a href="#guide-deploiement-fr">Déploiement</a>
+          <a href="#guide-mcserver-fr">Serveur Minecraft</a>
+          <a href="#guide-checklist-fr">Pense-bête</a>
+        </nav>
+        <h6><span class="tooltip" data-tooltip="Je suis une p'tite info-bulle"><u>Passe ta souris pour + d'infos</u></span></h6>
+
+        <div class="guide-content">
+          <section class="guide-section" id="guide-principe-fr">
+            <h3>1. Principe général</h3>
+            <p>Cette app permet de configurer un serveur Node.js pour le launcher <span class="tooltip" data-tooltip="Partons du principe que tu sais déjà configurer un serveur Minecraft"><u><strong>pas</strong> un serveur Minecraft</u></span> : elle te permet de le personnaliser à l'image de ta communauté, et de garantir que seuls les membres de ta communauté y aient accès.</p>
+            <p>Cet outil et le launcher ont été conçus pour <span class="tooltip" data-tooltip="Parce que j'en ai plein le dos de guider les membres un par un pour installer des mods... Surtout quand tu viens de tout expliquer, et que d'un coup un membre sauvage sort de son buisson et qu'il faut tout réexpliquer..."><u>distribuer des modpacks "tout prêts"</u></span> et les maintenir à jour automatiquement, sans aucune intervention de tes membres !</p>
+            <p>Le launcher, quant à lui, s'occupe d'installer les bonnes versions de Java, les loaders, et le bon client Minecraft d'après <span class="tooltip" data-tooltip="Ça n'installe pas toutes les versions, juste celle requise par le serveur, quand le membre clique sur « Installer »"><u>la version</u></span> que tu as configurée dans l'onglet <strong>Serveurs</strong>. Le serveur Node.js écrit automatiquement, via des commandes RCON, dans la whitelist de chaque serveur (si le RCON est configuré).</p>
+            <p>Cette application garde toutes tes données dans le dossier <code>ModCraft Deploy Admin</code> de ton dossier utilisateur (créé automatiquement au premier lancement, conservé lors des mises à jour) : son sous-dossier <code>api/</code> (le serveur) est : avec lui seul : ce qu'elle lit et modifie, et les serveurs Minecraft générés vont dans <code>serveurs-minecraft/</code>. Tu peux aussi importer un dossier <code>api/</code> déjà existant pour conserver tous tes réglages/serveurs déjà configurés sur ton hébergement.</p>
+            <div class="guide-warn">
+              <strong>Important</strong> : Les onglets Serveurs/Branding/Annonces écrivent <em>directement</em> dans <code>api/</code> dès l'enregistrement, sans brouillon. C'est volontaire : ça permet de lancer un serveur de test. Pour publier ces changements sur le <em>vrai</em> serveur, il faut ensuite passer par l'onglet <strong>Déploiement</strong>.
+            </div>
+            <p>Si <code>api/</code> est introuvable au démarrage, un bouton <strong>« 🔧 Recréer le dossier api/ »</strong> apparaît et recrée les fichiers d'exemple complets à partir du modèle intégré à l'application.</p>
+          </section>
+
+          <section class="guide-section" id="guide-dashboard-fr">
+            <h3>2. Tableau de bord</h3>
+            <p><strong>▶ Démarrer / ⏹ Arrêter</strong> lance le serveur de test du launcher (<code>node src/index.js</code>) directement depuis le dossier <code>api/</code> ; les logs s'affichent dans la console en dessous.</p>
+            <p><strong>📋 Copier launcher.config.json</strong> crée une copie de la configuration pointant vers ce serveur local : à coller dans <code>launcher.config.json</code> pour tester le launcher LOCALEMENT contre tes changements, avant de les appliquer au vrai serveur.</p>
+          </section>
+
+          <section class="guide-section" id="guide-serveurs-fr">
+            <h3>3. Onglet Serveurs</h3>
+            <p>Une carte = un serveur qui s'affiche dans le launcher (id, nom, description, bannière, adresse, version + loader).</p>
+            <p><strong>Auto-connexion</strong> : case à cocher pour que le jeu rejoigne automatiquement ce serveur au lancement (arguments <code>--server</code>/<code>--port</code>). Activée par défaut.</p>
+            <p><strong>Online-mode</strong> : à faire correspondre au réglage <code>online-mode</code> du <em>vrai</em> serveur Minecraft (fichier <code>server.properties</code>) : affiche côté joueur un badge <span class="tooltip" data-tooltip="🪟 Microsoft si coché (comptes premium uniquement), tous les comptes (Microsoft, Ely.by, gratuit) si décoché"><u>avec infobulle</u></span> à côté de la version, pour que le joueur sache tout de suite quel type de compte fonctionne sur ce serveur.</p>
+            <p><strong>Modpack (optionnel)</strong> : laisse vide pour un serveur vanilla : le launcher installera juste le client, sans rien de plus. Pour les modpacks : choisis le dossier des fichiers, puis génère le manifest. L'avantage de ce launcher, c'est qu'il te permet de copier l'intégralité du dossier Minecraft que tu auras préalablement configuré sur ton PC : l'idéal est de copier les dossiers <code>config/</code>, <code>mods/</code>, <code>shaderpacks/</code>, <code>resourcepacks/</code>, et les fichiers <code>options.txt</code> et <code>servers.dat</code>.</p>
+            <p><strong>🔒 Sécurité</strong> : seuls les formats réellement utilisés par Minecraft sont copiés lors de l'import (mods <code>.jar</code>, configs, textures, packs <code>.zip</code>...) : tout le reste, <span class="tooltip" data-tooltip="Executables Windows, scripts, DLL... refusés à l'import, à la génération du manifest, ET au téléchargement côté launcher : trois vérifications indépendantes"><u>en particulier les exécutables</u></span>, est automatiquement ignoré avec un message listant les fichiers rejetés. Côté joueur, le launcher lance aussi un scan Windows Defender après chaque téléchargement de nouveaux fichiers, avant d'autoriser le lancement du jeu.</p>
+            <div class="guide-warn">
+              <strong>Attention</strong> : Évite de copier l'intégralité du dossier (même si rien ne t'en empêche) : tes joueurs se retrouveraient avec tout ce que tu as déjà généré et configuré, par exemple JourneyMap, ton UUID, ou tes touches clavier (keybinds).
+            </div>
+            <p><strong>Explication des différents dossiers et fichiers :</strong></p>
+            <ul>
+              <li><strong><code>config/</code></strong> : les fichiers de configuration des mods Minecraft.</li>
+              <li><strong><code>mods/</code></strong> : les mods installés pour le serveur.</li>
+              <li><strong><code>shaderpacks/</code></strong> : les packs de shaders utilisés.</li>
+              <li><strong><code>resourcepacks/</code></strong> : les packs de ressources utilisés.</li>
+              <li><strong><code>options.txt</code></strong> : définit les options du client Minecraft et est lu à chaque lancement. Si, dans ton jeu, tu actives le narrateur, modifies des options graphiques, la langue, ou actives les shaders, c'est dans ce fichier que ça se passe. Ce fichier peut être important quand ton serveur utilise resourcepacks/shaderpacks à activer, puisqu'ils le seront par défaut si tu les actives dans le jeu : si tu modifies les touches du clavier, elles seront également copiées.</li>
+              <li><strong><code>servers.dat</code></strong> : liste des serveurs connus par le client Minecraft. Quand tu ouvres ton jeu et ajoutes un serveur, il est enregistré dans ce fichier.</li>
+              <li><strong><code>*.txt</code></strong> : certains mods écrivent leur config dans <code>config/</code> ou directement à la racine du dossier de jeu, au format <code>.txt</code>. Comme pour <code>options.txt</code>, ça te permet de pré-configurer le mod avant même que le joueur y touche.</li>
+            </ul>
+            <p><strong>RCON</strong> (hôte/port/mot de passe) active la whitelist automatique : chaque joueur qui utilise le launcher y est ajouté automatiquement, sans intervention manuelle.</p>
+          </section>
+
+          <section class="guide-section" id="guide-branding-fr">
+            <h3>4. Onglet Branding</h3>
+            <p><strong>Identité</strong> : nom, langue, couleur d'accent, logo, fond, icône de fenêtre, musique, liens site/Discord.</p>
+            <p><strong>Thème de couleurs</strong> : 7 couleurs pour un habillage complet, sans toucher au code.</p>
+            <p><strong>Connexion</strong> : active/désactive compte gratuit, Ely.by, Microsoft (+ client ID) et Discord Rich Presence individuellement : inclut aussi une bannière unique pour toutes les « Versions libres » (pas de bannière par installation, puisqu'elles sont créées par le joueur lui-même).</p>
+            <p><strong>Easter egg</strong> : liste libre de zones cachées (un coin de la fenêtre, ou le texte de copyright) déclenchant chacune un son ou un gif au clic : ajoute/supprime autant d'entrées que tu veux. Plusieurs entrées sur la même zone (un gif + un mp3) se lancent ensemble ; un anti-spam ignore les clics tant qu'un easter egg joue.</p>
+          </section>
+
+          <section class="guide-section" id="guide-annonces-fr">
+            <h3>5. Onglet Annonces</h3>
+            <p>« + Nouvelle annonce » ouvre une fiche titre/date/texte. La plus récente (première du tableau) déclenche la popup automatique côté launcher si le joueur ne l'a pas encore vue.</p>
+          </section>
+
+          <section class="guide-section" id="guide-deploiement-fr">
+            <h3>6. Onglet Déploiement</h3>
+            <p>Une carte (SFTP, ou FTP / FTPS pour un hébergeur sans SFTP) vers le vrai serveur, avec 3 actions indépendantes, plus un diagnostic :</p>
+            <p><strong>1. Mettre à jour le code</strong> : envoie <code>src/</code>, <code>scripts/</code>, <code>package.json</code>... sans JAMAIS toucher à <code>data/</code> ni <code>modpacks/</code>. Sans danger, à relancer à chaque mise à jour du launcher/admin.</p>
+            <div class="guide-warn">
+              <strong>À ne jamais oublier</strong> : Envoyer le code ne suffit pas : le serveur Node déjà en mémoire continue de tourner sur l'ancien code tant qu'il n'est pas redémarré depuis le panneau d'hébergement (PufferPanel ou équivalent).
+            </div>
+            <p><strong>2. Config</strong> : « Voir les différences » compare chaque fichier avant que « Déployer la config » n'écrase <code>data/</code> + <code>modpacks/</code> (fichiers déjà identiques ignorés automatiquement).</p>
+            <p><strong>3. Fichiers individuels</strong> : envoie juste <code>branding.json</code>, <code>news.json</code>, ou <code>servers.json</code> + les modpacks qu'il référence (manifest régénéré, diff appliqué).</p>
+            <p><strong>Diagnostic (SFTP)</strong> : « Voir le contenu distant » liste ce qu'il y a vraiment à l'emplacement configuré, avec la date de modification de chaque fichier : le plus rapide pour vérifier qu'un envoi a atteint le bon dossier.</p>
+          </section>
+
+          <section class="guide-section" id="guide-mcserver-fr">
+            <h3>7. Onglet Serveur Minecraft</h3>
+            <p>Fabrique un <strong>serveur Minecraft prêt à l'emploi</strong> à partir d'un serveur déjà configuré dans l'onglet Serveurs : version, loader (Vanilla, Forge, Fabric, Quilt, NeoForge), modpack, mode de compte (online-mode), RCON et arguments Java. Le résultat est un dossier (et un zip) : jar ou installeur du loader, <code>mods/</code> + <code>config/</code>, <code>server.properties</code>, <code>eula.txt</code>, <code>jvm-args.txt</code> et des scripts <code>start-server.sh</code> / <code>start-server.bat</code>.</p>
+            <p><strong>Mods client / serveur</strong> : les mods « client uniquement » (OptiFine, JourneyMap…) doivent rester hors du serveur. L'outil en détecte une partie ; corrige le reste dans la liste (« Client uniquement » = exclu). Les dossiers <code>resourcepacks/</code>, <code>shaderpacks/</code>, <code>optifine/</code> et les fichiers <code>options*.txt</code> sont toujours exclus.</p>
+            <p><strong>EULA</strong> : coche la case pour écrire <code>eula=true</code> ; sinon le fichier contient <code>eula=false</code> et tu l'acceptes toi-même avant le premier démarrage.</p>
+            <p><strong>Installer le loader maintenant</strong> : pour Forge, NeoForge et Quilt, lance l'installeur ici ; si aucun Java compatible n'est installé, l'outil télécharge automatiquement le bon (Eclipse Temurin, vérifié par SHA-256, dans son propre dossier : rien n'est installé sur votre système). Sinon, les scripts l'installent au premier démarrage (Internet requis).</p>
+            <p><strong>Version de Java</strong> : un serveur ne tourne que sur certaines versions (Forge 1.7.10 à 1.12 : Java 8 uniquement). Les scripts <code>start-server.bat</code> / <code>.sh</code> cherchent eux-mêmes le Java qui convient parmi ceux installés ; <code>JAVA_BIN</code> permet d'en forcer un.</p>
+            <p><strong>Envoi SFTP / FTP</strong> : session propre à chaque serveur Minecraft (protocole SFTP, FTP ou FTPS, hôte, port, compte, mot de passe et chemin distant, enregistrés chiffrés), distincte de celle de l'onglet Déploiement qui vise l'API du launcher ; un bouton teste la connexion. Les fichiers inchangés sont ignorés et rien n'est supprimé sur le serveur (le monde n'est jamais touché) ; la suppression des anciens mods de <code>mods/</code> est optionnelle. Les fichiers de réglages déjà présents (<code>server.properties</code>…) sont conservés par défaut.</p>
+            <div class="guide-warn">
+              <strong>Panels (PufferPanel, Pterodactyl…)</strong> : leur propre commande de démarrage remplace nos scripts : la commande exacte à saisir est écrite dans <code>LISEZMOI-SERVEUR.txt</code> et affichée après la génération. Le dossier généré n'est pas fait pour être lancé sur place : l'admin refuse d'écraser un dossier qui contient un monde.
+            </div>
+          </section>
+
+          <section class="guide-section" id="guide-checklist-fr">
+            <h3>7. Récapitulatif étape par étape</h3>
+
+            <h4>Avant l'outil (sur ton vrai serveur Minecraft)</h4>
+            <ol>
+              <li>Installe ton serveur Minecraft comme d'habitude, copie le dossier <code>mods/</code>.</li>
+              <li>Active la whitelist, configure le RCON, puis démarre le serveur Minecraft.</li>
+            </ol>
+
+            <h4>Avec l'outil admin</h4>
+            <ol>
+              <li>Modifie serveurs/branding/annonces dans les onglets correspondants.</li>
+              <li>Teste en local (Tableau de bord → Démarrer, launcher pointé dessus via <code>launcher.config.json</code>) : pas obligatoire si tu aimes vivre dangereusement, mais recommandé pour garder tout à jour.</li>
+              <li>Déploiement → « Voir les différences » avant d'écraser quoi que ce soit.</li>
+              <li>Déploie la config (ou juste le fichier individuel concerné).</li>
+              <li>Si le code de l'API a changé : déploie le code <em>puis</em> redémarre le process sur le serveur réel.</li>
+              <li>« Voir le contenu distant » pour confirmer que tout est bien arrivé.</li>
+            </ol>
+          </section>
+        </div>
+      </div>
+
+      <!-- =============================== ENGLISH =============================== -->
+      <div class="guide-lang-block" data-guide-lang="en" hidden>
+        <nav class="guide-toc">
+          <a href="#guide-principe-en">General principle</a>
+          <a href="#guide-dashboard-en">Dashboard</a>
+          <a href="#guide-serveurs-en">Servers</a>
+          <a href="#guide-branding-en">Branding</a>
+          <a href="#guide-annonces-en">Announcements</a>
+          <a href="#guide-deploiement-en">Deployment</a>
+          <a href="#guide-mcserver-en">Minecraft server</a>
+          <a href="#guide-checklist-en">Cheat sheet</a>
+        </nav>
+        <h6><span class="tooltip" data-tooltip="I'm a little tooltip"><u>Hover for + info</u></span></h6>
+
+        <div class="guide-content">
+          <section class="guide-section" id="guide-principe-en">
+            <h3>1. General principle</h3>
+            <p>This app lets you configure a Node.js server for the launcher <span class="tooltip" data-tooltip="Assuming you already know how to set up a Minecraft server"><u><strong>not</strong> a Minecraft server</u></span>: it lets you customize it to match your community's identity, and makes sure only your community's members can access it.</p>
+            <p>This tool and the launcher were built to <span class="tooltip" data-tooltip="Because I'm sick of walking members through mod installs one by one... especially right after explaining everything, when a wild member suddenly pops out of nowhere and you have to explain it all over again..."><u>distribute "ready-to-play" modpacks</u></span> and keep them updated automatically, with zero effort from your members!</p>
+            <p>The launcher itself installs the right Java version, the right loader, and the right Minecraft client based on <span class="tooltip" data-tooltip="This doesn't install every version, just the one required by the server, when the member clicks &quot;Install&quot;"><u>the version</u></span> you configured in the <strong>Servers</strong> tab. The Node.js server automatically writes to each server's whitelist via RCON commands (if RCON is configured).</p>
+            <p>This application keeps all your data in the <code>ModCraft Deploy Admin</code> folder inside your user folder (created automatically on first launch, kept across updates): its <code>api/</code> subfolder (the server) is the only thing it ever reads or modifies, and generated Minecraft servers go to <code>serveurs-minecraft/</code>. You can also import an existing <code>api/</code> folder to keep all the settings/servers you already configured on your host.</p>
+            <div class="guide-warn">
+              <strong>Important</strong> : The Servers/Branding/Announcements tabs write <em>directly</em> to <code>api/</code> as soon as you save, no draft. That's intentional : it's what lets you run a local test server. To publish those changes to your <em>real</em> server, you then need to go through the <strong>Deployment</strong> tab.
+            </div>
+            <p>If <code>api/</code> can't be found on startup, a <strong>"🔧 Recreate the api/ folder"</strong> button appears and rebuilds a complete example setup from the template bundled with the app.</p>
+          </section>
+
+          <section class="guide-section" id="guide-dashboard-en">
+            <h3>2. Dashboard</h3>
+            <p><strong>▶ Start / ⏹ Stop</strong> runs the launcher's test server (<code>node src/index.js</code>) directly from the selected <code>api/</code> folder; logs stream into the console below.</p>
+            <p><strong>📋 Copy launcher.config.json</strong> creates a copy of the config pointing at this local server : paste it into <code>launcher.config.json</code> to test the launcher LOCALLY against your changes, before applying them to the real server.</p>
+          </section>
+
+          <section class="guide-section" id="guide-serveurs-en">
+            <h3>3. Servers tab</h3>
+            <p>One card = one server shown in the launcher (id, name, description, banner, address, version + loader).</p>
+            <p><strong>Auto-connect</strong>: checkbox so the game automatically joins this server on launch (<code>--server</code>/<code>--port</code> arguments). Enabled by default.</p>
+            <p><strong>Online-mode</strong>: should match the <code>online-mode</code> setting of the <em>real</em> Minecraft server (<code>server.properties</code>) : shows the player a badge <span class="tooltip" data-tooltip="🪟 Microsoft if checked (premium accounts only), all accounts (Microsoft, Ely.by, free) if unchecked"><u>with a tooltip</u></span> next to the version, so they immediately know which account type works on this server.</p>
+            <p><strong>Modpack (optional)</strong> : leave blank for a vanilla server: the launcher will just install the client, nothing more. For modpacks: pick the files folder, then generate the manifest. The advantage of this launcher is that it lets you copy your entire, already-configured local Minecraft folder : ideally copy the <code>config/</code>, <code>mods/</code>, <code>shaderpacks/</code>, <code>resourcepacks/</code> folders, and the <code>options.txt</code>/<code>servers.dat</code> files.</p>
+            <p><strong>🔒 Security</strong>: only formats actually used by Minecraft are copied on import (mods <code>.jar</code>, configs, textures, <code>.zip</code> packs...) : everything else, <span class="tooltip" data-tooltip="Windows executables, scripts, DLLs... rejected at import, at manifest generation, AND at download on the launcher side : three independent checks"><u>executables especially</u></span>, is automatically skipped with a message listing the rejected files. On the player's side, the launcher also runs a Windows Defender scan after downloading new files, before allowing the game to launch.</p>
+            <div class="guide-warn">
+              <strong>Careful</strong> : Avoid copying the entire folder (even though nothing stops you): your players would end up with everything you've already generated and configured, e.g. JourneyMap, your UUID, or your keybinds.
+            </div>
+            <p><strong>What each folder/file is for:</strong></p>
+            <ul>
+              <li><strong><code>config/</code></strong>: Minecraft mods' configuration files.</li>
+              <li><strong><code>mods/</code></strong>: the mods installed for the server.</li>
+              <li><strong><code>shaderpacks/</code></strong>: the shader packs used.</li>
+              <li><strong><code>resourcepacks/</code></strong>: the resource packs used.</li>
+              <li><strong><code>options.txt</code></strong>: defines the Minecraft client's options and is read on every launch. If, in your game, you enable the narrator, change graphics options/language, or enable shaders, that's what gets saved here. This file matters if your server ships with resourcepacks/shaderpacks meant to be on by default : enabling them in-game once will make it so, and keyboard rebinds get copied along too.</li>
+              <li><strong><code>servers.dat</code></strong>: the list of servers known to the Minecraft client. Open your game, add a server, and it's saved here.</li>
+              <li><strong><code>*.txt</code></strong>: some mods write their config to <code>config/</code> or directly at the game folder's root, as <code>.txt</code> files. Just like <code>options.txt</code>, this lets you pre-configure the mod before a player even touches it.</li>
+            </ul>
+            <p><strong>RCON</strong> (host/port/password) enables the automatic whitelist: every player who uses the launcher gets added automatically, no manual work.</p>
+          </section>
+
+          <section class="guide-section" id="guide-branding-en">
+            <h3>4. Branding tab</h3>
+            <p><strong>Identity</strong>: name, language, accent color, logo, background, window icon, custom CSS, music, site/Discord links.</p>
+            <p><strong>Color theme</strong>: 7 colors for a full reskin, no code required.</p>
+            <p><strong>Login</strong>: enable/disable free account, Ely.by, Microsoft (+ client ID) and Discord Rich Presence individually : also includes a single banner shared by all "Custom versions" (no per-install banner, since players create those themselves).</p>
+            <p><strong>Easter egg</strong>: a free-form list of hidden zones (a corner of the window, or the copyright text) that each trigger a sound or a gif when clicked : add/remove as many entries as you like. Several entries on the same zone (a gif + an mp3) start together; an anti-spam ignores clicks while an easter egg is playing.</p>
+          </section>
+
+          <section class="guide-section" id="guide-annonces-en">
+            <h3>5. Announcements tab</h3>
+            <p>"+ New announcement" opens a title/date/text form. The most recent one (first in the table) triggers the automatic popup on the launcher side if the player hasn't seen it yet.</p>
+          </section>
+
+          <section class="guide-section" id="guide-deploiement-en">
+            <h3>6. Deployment tab</h3>
+            <p>One card (SFTP, or FTP / FTPS for a host without SFTP) to the real server, with 3 independent actions, plus diagnostics:</p>
+            <p><strong>1. Update the code</strong> : sends <code>src/</code>, <code>scripts/</code>, <code>package.json</code>... and NEVER touches <code>data/</code> or <code>modpacks/</code>. Safe to run, re-run it after every launcher/admin update.</p>
+            <div class="guide-warn">
+              <strong>Never forget</strong> : Sending the code isn't enough: the Node server already running in memory keeps executing the old code until it's restarted from your hosting panel (PufferPanel or similar).
+            </div>
+            <p><strong>2. Config</strong> : "View differences" compares every file before "Deploy config" overwrites <code>data/</code> + <code>modpacks/</code> (files that are already identical are skipped automatically).</p>
+            <p><strong>3. Individual files</strong> : sends just <code>branding.json</code>, <code>news.json</code>, or <code>servers.json</code> + the modpacks it references (manifest regenerated, diff applied).</p>
+            <p><strong>Diagnostics (SFTP)</strong> : "View remote content" lists what's actually at the configured location, with each file's last-modified date: the fastest way to confirm an upload actually reached the right folder.</p>
+          </section>
+
+          <section class="guide-section" id="guide-mcserver-en">
+            <h3>7. Minecraft server tab</h3>
+            <p>Builds a <strong>ready-to-run Minecraft server</strong> from a server already configured in the Servers tab: version, loader (Vanilla, Forge, Fabric, Quilt, NeoForge), modpack, account mode (online-mode), RCON and Java arguments. The result is a folder (and a zip): loader jar or installer, <code>mods/</code> + <code>config/</code>, <code>server.properties</code>, <code>eula.txt</code>, <code>jvm-args.txt</code> and <code>start-server.sh</code> / <code>start-server.bat</code> scripts.</p>
+            <p><strong>Client / server mods</strong> : "client only" mods (OptiFine, JourneyMap…) must stay off the server. The tool detects some of them; fix the rest in the list ("Client only" = excluded). <code>resourcepacks/</code>, <code>shaderpacks/</code>, <code>optifine/</code> and <code>options*.txt</code> are always excluded.</p>
+            <p><strong>EULA</strong> : tick the box to write <code>eula=true</code>; otherwise the file contains <code>eula=false</code> and you accept it yourself before the first start.</p>
+            <p><strong>Install the loader now</strong> : for Forge, NeoForge and Quilt, runs the installer here; if no compatible Java is installed, the tool automatically downloads the right one (Eclipse Temurin, SHA-256 verified, into its own folder: nothing is installed on your system). Otherwise the scripts install it on first start (Internet required).</p>
+            <p><strong>Java version</strong> : a server only runs on certain versions (Forge 1.7.10 to 1.12: Java 8 only). The <code>start-server.bat</code> / <code>.sh</code> scripts look for a suitable Java among the installed ones; <code>JAVA_BIN</code> forces a specific one.</p>
+            <p><strong>SFTP / FTP upload</strong> : a session of its own for each Minecraft server (SFTP, FTP or FTPS protocol, host, port, account, password and remote path, stored encrypted), separate from the Deployment tab which targets the launcher API; a button tests the connection. Unchanged files are skipped and nothing is deleted on the server (the world is never touched); removing old mods from <code>mods/</code> is optional. Existing settings files (<code>server.properties</code>…) are kept by default.</p>
+            <div class="guide-warn">
+              <strong>Panels (PufferPanel, Pterodactyl…)</strong> : their own startup command replaces our scripts: the exact command to enter is written in <code>LISEZMOI-SERVEUR.txt</code> and shown after generation. The generated folder isn't meant to be run in place: the admin refuses to overwrite a folder that contains a world.
+            </div>
+          </section>
+
+          <section class="guide-section" id="guide-checklist-en">
+            <h3>7. Step-by-step cheat sheet</h3>
+
+            <h4>Before using the tool (on your real Minecraft server)</h4>
+            <ol>
+              <li>Set up your Minecraft server as usual, copy the <code>mods/</code> folder.</li>
+              <li>Enable the whitelist, configure RCON, then start the Minecraft server.</li>
+            </ol>
+
+            <h4>With the admin tool</h4>
+            <ol>
+              <li>Edit servers/branding/announcements in their respective tabs.</li>
+              <li>Test locally (Dashboard → Start, launcher pointed at it via <code>launcher.config.json</code>) : not mandatory if you like living dangerously, but recommended to keep everything in sync.</li>
+              <li>Deployment → "View differences" before overwriting anything.</li>
+              <li>Deploy the config (or just the individual file in question).</li>
+              <li>If the API code changed: deploy the code <em>then</em> restart the process on the real server.</li>
+              <li>"View remote content" to confirm everything actually arrived.</li>
+            </ol>
+          </section>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="primary" id="btn-guide-close">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

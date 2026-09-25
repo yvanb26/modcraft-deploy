@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Defense en profondeur : meme si du HTML/attribut injecte se glissait
+       un jour (ex: via des champs branding/servers/news mal echappes cote
+       operateur), script-src 'self' empeche tout script/gestionnaire inline
+       de s'executer : seuls locales.js/i18n.js/renderer.js (fichiers locaux
+       de l'app) peuvent tourner. img/media autorises en http/https car les
+       URLs de branding (logo/fond/musique) sont configurables par
+       l'operateur vers n'importe quel hebergeur. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' http: https: data:;
+    media-src 'self' http: https:;
+    font-src 'self' data:;
+    connect-src 'self';
+    object-src 'none';
+    base-uri 'none';
+    form-action 'none';
+    frame-src 'none';
+  " />
+  <title>ModCraft Deploy Launcher</title>
+  <!-- Applique le theme (clair/sombre) avant le premier rendu : evite un flash. -->
+  <script src="theme-init.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="overlay-scrim"></div>
+  <!-- Zones "easter egg" (configure par l'operateur : branding.easterEgg) :
+       chacune est une petite zone invisible a un endroit fixe de la fenetre,
+       cliquer dessus declenche le son/gif associe. Positionnees dans les
+       marges des coins (cf. styles.css), donc sans jamais recouvrir un vrai
+       bouton/lien. (Les 2 coins du haut sont dans <header>, cf. plus bas.) -->
+  <div class="easteregg-zone" data-easteregg-zone="corner-bl"></div>
+  <div class="easteregg-zone" data-easteregg-zone="corner-br"></div>
+  <div id="app">
+    <header>
+      <!-- Coins du haut : dans <header> (zone de deplacement de la fenetre sans
+           cadre) pour rester cliquables : une zone "no-drag" n'est prise en
+           compte que si elle est un descendant de la zone "drag" ou declaree
+           apres elle, jamais avant. -->
+      <div class="easteregg-zone" data-easteregg-zone="corner-tl"></div>
+      <div class="easteregg-zone" data-easteregg-zone="corner-tr"></div>
+      <div class="header-left">
+        <img id="brand-logo" class="logo" alt="logo" />
+        <h1 id="brand-name">Launcher</h1>
+      </div>
+      <div class="tabs nav-tabs" id="main-nav" style="display:none;">
+        <button class="tab-btn active" id="nav-servers" data-i18n="nav.servers"></button>
+        <button class="tab-btn" id="nav-custom" data-i18n="nav.custom"></button>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn-bell" id="btn-theme" data-i18n-title="theme.toggle" aria-label="Theme">
+          <svg class="ico-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="ico-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+        <div class="menu-wrap" id="notif-wrap" style="display:none;">
+          <button class="icon-btn-bell" id="btn-notifications" data-i18n-title="notif.button">
+            🔔<span class="notif-badge" id="notif-badge" hidden>0</span>
+          </button>
+          <div class="dropdown-menu notif-dropdown" id="notif-dropdown" hidden>
+            <div class="notif-header">
+              <span data-i18n="notif.title"></span>
+              <div class="notif-header-actions">
+                <button class="link-btn" id="notif-mark-all-read" data-i18n="notif.markAllRead"></button>
+                <button class="link-btn" id="notif-mark-all-unread" data-i18n="notif.markAllUnread"></button>
+              </div>
+            </div>
+            <div id="notif-list"></div>
+          </div>
+        </div>
+        <div class="menu-wrap" id="menu-wrap" style="display:none;">
+          <button class="account" id="btn-menu" data-i18n-title="menu.account">
+            <span id="menu-label"></span>
+          </button>
+        </div>
+        <div class="menu-wrap" id="burger-wrap" style="display:none;">
+          <button class="icon-btn-bell" id="btn-burger" data-i18n-title="menu.menu" aria-label="Menu">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            <span class="icon-btn-dot narrow-only" id="burger-dot" hidden></span>
+          </button>
+          <div class="dropdown-menu burger-dropdown" id="burger-dropdown" hidden>
+            <div class="music-control" id="music-control">
+              <span class="music-title" data-i18n="music.title"></span>
+              <button id="btn-mute" title="Couper/activer la musique">🔊</button>
+              <input type="range" id="music-volume" min="0" max="100" value="25" />
+              <label class="checkbox-field music-focus-field">
+                <input type="checkbox" id="music-focus-toggle" checked />
+                <span data-i18n="music.focusToggle"></span>
+              </label>
+            </div>
+            <div class="dropdown-sep"></div>
+            <!-- Visibles seulement quand la fenetre est etroite : la cloche et le bouton de
+                 theme de l'en-tete y sont alors reranges (cf. styles.css). -->
+            <button class="dropdown-item narrow-only" id="menu-item-notifications" hidden>
+              <span data-i18n="notif.title"></span>
+              <span class="notif-badge-inline" id="menu-notif-badge" hidden>0</span>
+            </button>
+            <button class="dropdown-item" id="menu-item-options" data-i18n="menu.options"></button>
+            <button class="dropdown-item" id="menu-item-news" data-i18n="menu.news"></button>
+            <button class="dropdown-item narrow-only" id="menu-item-theme"><span id="menu-theme-label"></span></button>
+          </div>
+        </div>
+        <div class="window-controls">
+          <button class="win-btn" id="win-min" data-i18n-title="window.minimize" aria-label="Minimize">
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 6h8"/></svg>
+          </button>
+          <button class="win-btn" id="win-max" data-i18n-title="window.maximize" aria-label="Maximize">
+            <svg class="ico-max" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="2" width="8" height="8" rx="1.5"/></svg>
+            <svg class="ico-restore" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="6" height="6" rx="1.2"/><path d="M4.5 4V3.2A1.2 1.2 0 0 1 5.7 2h3.1A1.2 1.2 0 0 1 10 3.2v3.1a1.2 1.2 0 0 1-1.2 1.2H8"/></svg>
+          </button>
+          <button class="win-btn win-close" id="win-close" data-i18n-title="window.close" aria-label="Close">
+            <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+    <audio id="bg-music" loop></audio>
+
+    <main>
+      <!-- Ecran de chargement / erreur de connexion au serveur -->
+      <div class="view active" id="view-boot">
+        <div class="splash">
+          <div class="splash-glow"></div>
+          <img id="splash-logo" class="splash-logo" alt="logo" />
+          <div class="splash-spinner" id="splash-spinner"></div>
+          <p id="boot-message" class="splash-message" data-i18n="boot.connecting"></p>
+          <div class="error-box" id="boot-error"></div>
+          <button class="primary" id="btn-retry-boot" style="display:none; margin-top:10px;" data-i18n="boot.retry"></button>
+        </div>
+      </div>
+
+      <!-- Ecran de connexion -->
+      <div class="view" id="view-login">
+        <div class="center-box" style="position:relative;">
+          <button class="close-btn" id="btn-login-close" title="✕">✕</button>
+          <div class="tabs">
+            <button class="tab-btn active" data-tab="offline" data-i18n="login.tab.offline"></button>
+            <button class="tab-btn" data-tab="elyby" data-i18n="login.tab.elyby"></button>
+            <button class="tab-btn" data-tab="microsoft" data-i18n="login.tab.microsoft"></button>
+          </div>
+
+          <div class="login-pane active" data-pane="offline">
+            <input type="text" id="offline-username" data-i18n-placeholder="login.offline.placeholder" />
+            <button class="primary" id="btn-login-offline" data-i18n="login.offline.button"></button>
+          </div>
+
+          <div class="login-pane" data-pane="elyby">
+            <input type="text" id="elyby-username" data-i18n-placeholder="login.elyby.username" />
+            <input type="password" id="elyby-password" data-i18n-placeholder="login.elyby.password" />
+            <input type="text" id="elyby-totp" data-i18n-placeholder="login.elyby.totp" />
+            <button class="primary" id="btn-login-elyby" data-i18n="login.elyby.button"></button>
+          </div>
+
+          <div class="login-pane" data-pane="microsoft">
+            <p style="font-size:13px; color:var(--text-dim);" data-i18n="login.microsoft.description"></p>
+            <button class="primary" id="btn-login-microsoft" data-i18n="login.microsoft.button"></button>
+          </div>
+
+          <div class="error-box" id="login-error" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+      <!-- Liste des serveurs -->
+      <div class="view" id="view-servers">
+        <div class="servers-grid" id="servers-grid"></div>
+      </div>
+
+      <!-- Versions libres (choix version + loader, comme le TLauncher) -->
+      <div class="view" id="view-custom">
+        <div class="toolbar-row">
+          <button class="primary" id="btn-new-instance" data-i18n="custom.new"></button>
+        </div>
+        <div class="servers-grid" id="custom-instances-grid"></div>
+      </div>
+
+      <!-- Progression de lancement/installation : partagee entre les vues.
+           N'apparait que si l'option "Afficher la console de lancement" est
+           active (Menu > Options) : le bouton "Jouer" lui-meme affiche deja
+           l'essentiel (Preparation.../Telechargement X%), ce bloc ne sert
+           plus qu'au debogage. -->
+      <div class="progress-panel" id="progress-panel">
+        <div class="progress-row">
+          <div id="progress-label" data-i18n="progress.preparing"></div>
+          <div class="progress-row-actions">
+            <button class="secondary" id="btn-kill-game" data-i18n="progress.forceStop" hidden></button>
+            <button class="icon-btn-close" id="btn-hide-console" data-i18n-title="progress.hideConsole">✕</button>
+          </div>
+        </div>
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+        <div class="log" id="progress-log"></div>
+      </div>
+    </main>
+
+    <!-- Popup reglages par instance (memoire + GPU) -->
+    <div class="modal-overlay" id="settings-modal">
+      <div class="modal-box">
+        <h2 id="settings-modal-title" data-i18n="settings.title"></h2>
+
+        <label class="field" id="settings-name-field">
+          <span data-i18n="custom.modal.name"></span>
+          <input type="text" id="settings-name" />
+        </label>
+
+        <label class="field">
+          <span data-i18n="settings.memoryMin"></span>
+          <input type="number" id="settings-memory-min" min="1" max="32" step="1" />
+        </label>
+        <label class="field">
+          <span data-i18n="settings.memoryMax"></span>
+          <input type="number" id="settings-memory-max" min="1" max="32" step="1" />
+        </label>
+        <label class="field">
+          <span data-i18n="settings.gpu"></span>
+          <select id="settings-gpu">
+            <option value="auto" data-i18n="settings.gpu.auto"></option>
+            <option value="integrated" data-i18n="settings.gpu.integrated"></option>
+            <option value="dedicated" data-i18n="settings.gpu.dedicated"></option>
+          </select>
+        </label>
+        <div class="field-hint" id="settings-ram-hint"></div>
+
+        <div class="modal-actions modal-actions-wrap">
+          <button class="secondary" id="btn-open-folder" data-i18n="settings.openFolder"></button>
+          <button class="secondary" id="btn-open-logs" data-i18n="settings.openLogs"></button>
+          <button class="secondary" id="btn-repair" data-i18n="settings.repair"></button>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary" id="btn-settings-cancel" data-i18n="settings.cancel"></button>
+          <button class="primary" id="btn-settings-save" data-i18n="settings.save"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup gestionnaire de comptes (switch rapide entre offline/Ely.by/Microsoft) -->
+    <div class="modal-overlay" id="accounts-modal">
+      <div class="modal-box">
+        <h2 data-i18n="accounts.title"></h2>
+
+        <div id="accounts-list"></div>
+
+        <div class="modal-actions modal-actions-wrap">
+          <button class="secondary" id="btn-accounts-disconnect" data-i18n="accounts.disconnect"></button>
+          <button class="secondary" id="btn-accounts-add" data-i18n="accounts.add"></button>
+        </div>
+        <div class="modal-actions">
+          <button class="primary" id="btn-accounts-close" data-i18n="accounts.close"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup options generales du launcher -->
+    <div class="modal-overlay" id="options-modal">
+      <div class="modal-box">
+        <h2 data-i18n="options.title"></h2>
+
+        <div id="options-custom-section">
+          <label class="checkbox-field">
+            <input type="checkbox" id="option-show-snapshots" />
+            <span data-i18n="options.showSnapshots"></span>
+          </label>
+          <label class="checkbox-field">
+            <input type="checkbox" id="option-show-old-versions" />
+            <span data-i18n="options.showOldVersions"></span>
+          </label>
+        </div>
+
+        <label class="checkbox-field">
+          <input type="checkbox" id="option-auto-news" />
+          <span data-i18n="options.autoShowNews"></span>
+        </label>
+        <label class="checkbox-field">
+          <input type="checkbox" id="option-show-console" />
+          <span data-i18n="options.showConsole"></span>
+        </label>
+
+        <div class="option-block">
+          <div class="option-label" data-i18n="options.accentTitle"></div>
+          <div class="accent-picker">
+            <input type="color" id="option-accent-color" data-i18n-title="options.accentPick" />
+            <div class="accent-swatches" id="accent-swatches"></div>
+            <button class="secondary" id="btn-accent-reset" data-i18n="options.accentReset"></button>
+          </div>
+          <div class="field-hint" data-i18n="options.accentHint"></div>
+        </div>
+
+        <div class="modal-actions modal-actions-wrap">
+          <button class="secondary" id="btn-clear-cache" data-i18n="options.clearCache"></button>
+        </div>
+        <div class="field-hint" id="clear-cache-status"></div>
+
+        <div class="modal-actions">
+          <button class="primary" id="btn-options-close" data-i18n="accounts.close"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup annonces/actualites (configurees par l'operateur, api/data/news.json) -->
+    <div class="modal-overlay" id="news-modal">
+      <div class="modal-box">
+        <h2 data-i18n="news.title"></h2>
+
+        <div id="news-list"></div>
+
+        <div class="modal-actions">
+          <button class="primary" id="btn-news-close" data-i18n="accounts.close"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup nouvelle installation libre (version + loader) -->
+    <div class="modal-overlay" id="new-instance-modal">
+      <div class="modal-box">
+        <h2 data-i18n="custom.modal.title"></h2>
+
+        <label class="field">
+          <span data-i18n="custom.modal.name"></span>
+          <input type="text" id="new-instance-name" data-i18n-placeholder="custom.modal.namePlaceholder" />
+        </label>
+        <label class="field">
+          <span data-i18n="custom.modal.mcVersion"></span>
+          <select id="new-instance-mcversion"></select>
+        </label>
+        <label class="field">
+          <span data-i18n="custom.modal.loader"></span>
+          <select id="new-instance-loader">
+            <option value="vanilla">Vanilla</option>
+            <option value="forge">Forge</option>
+            <option value="fabric">Fabric</option>
+            <option value="quilt">Quilt</option>
+            <option value="neoforge">NeoForge</option>
+          </select>
+        </label>
+        <label class="field" id="new-instance-loaderversion-field">
+          <span data-i18n="custom.modal.loaderVersion"></span>
+          <select id="new-instance-loaderversion"></select>
+        </label>
+
+        <div class="error-box" id="new-instance-error"></div>
+
+        <div class="modal-actions">
+          <button class="secondary" id="btn-new-instance-cancel" data-i18n="settings.cancel"></button>
+          <button class="primary" id="btn-new-instance-create" data-i18n="custom.modal.create"></button>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <a id="brand-website" href="#" target="_blank" data-i18n="footer.website"></a>
+      <a id="brand-discord" href="#" target="_blank" data-i18n="footer.discord"></a>
+      <button class="link" id="btn-about" data-i18n="footer.about"></button>
+      <span class="spacer"></span>
+      <span data-i18n="footer.legal"></span>
+      <span class="footer-sep">·</span>
+      <span data-i18n="footer.copyright" data-easteregg-zone="footer-copyright"></span>
+    </footer>
+  </div>
+
+  <!-- Popup a propos -->
+  <div class="modal-overlay" id="about-modal">
+    <div class="modal-box">
+      <h2 id="about-app-name">Launcher</h2>
+      <p class="dim" id="about-version"></p>
+      <p class="about-text" data-i18n="about.text"></p>
+      <!-- Lien du developpeur, uniquement ici : le reste de l'interface est aux couleurs de la communaute. -->
+      <div class="about-links">
+        <a href="https://modcraft-deploy.com" target="_blank" rel="noopener noreferrer" data-i18n="about.site"></a>
+        <a href="mailto:support@modcraft-deploy.com" target="_blank" rel="noopener noreferrer" data-i18n="about.contact"></a>
+        <a href="https://discord.gg/XmGvvKkr3X" target="_blank" rel="noopener noreferrer" data-i18n="about.discord"></a>
+        <a href="https://ko-fi.com/modcraft_deploy" target="_blank" rel="noopener noreferrer" data-i18n="about.support"></a>
+      </div>
+      <div class="modal-actions">
+        <button class="primary" id="btn-about-close" data-i18n="accounts.close"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="locales.js"></script>
+  <script src="i18n.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

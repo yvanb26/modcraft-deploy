@@ -1,0 +1,53 @@
+{
+  "name": "modcraft-deploy-launcher",
+  "version": "1.0.0",
+  "description": "Launcher Minecraft brandable, pilote par une configuration serveur distante",
+  "main": "src/main/main.js",
+  "author": "Yvan Braga",
+  "homepage": "https://modcraft-deploy.com",
+  "repository": { "type": "git", "url": "https://github.com/yvanb26/modcraft-deploy.git" },
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.13.1",
+    "adm-zip": "^0.6.1",
+    "discord-rpc": "^4.0.1",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
+    "minecraft-launcher-core": "^3.18.2"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "overrides": {
+    "adm-zip": "^0.6.1",
+    "qs": "^6.16.0",
+    "form-data": "^4.0.4",
+    "tough-cookie": "^4.1.3",
+    "@azure/msal-node": {
+      "uuid": "^11.1.1"
+    }
+  },
+  "build": {
+    "appId": "com.modcraftdeploy.launcher",
+    "productName": "ModCraft Deploy Launcher",
+    "files": ["src/**/*", "package.json"],
+    "publish": {
+      "provider": "generic",
+      "url": "https://modcraft-deploy.com/updates/launcher"
+    },
+    "win": { "target": "nsis" },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh",
+      "artifactName": "ModCraft-Deploy-Launcher-Setup-${version}.${ext}"
+    },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" }
+  }
+}
